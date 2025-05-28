@@ -1,0 +1,30 @@
+#!/bin/sh
+BASEDIR=/$(realpath -s --relative-to="/" "$(dirname "$0")")
+ENVIRONMENT_DIR=$(dirname "$BASEDIR")/environment
+KUBEJS_DIR=$PWD
+
+if [ "$1" != "" ]; then
+    KUBEJS_DIR=$KUBEJS_DIR/$1
+fi
+
+KUBEJS_DIR=$KUBEJS_DIR/kubejs
+
+echo "KubeJS directory to copy from: $KUBEJS_DIR"
+
+if [ ! -d "$KUBEJS_DIR" ]; then
+    echo "KubeJS directory not found: $KUBEJS_DIR"
+    exit 1
+fi
+
+if [ ! -d "$ENVIRONMENT_DIR" ]; then
+    echo "Environment directory not found: $ENVIRONMENT_DIR"
+    exit 1
+fi
+
+if [ ! -d "$ENVIRONMENT_DIR"/kubejs ]; then
+    echo "Creating KubeJS directory: $ENVIRONMENT_DIR/kubejs"
+    mkdir -p "$ENVIRONMENT_DIR"/kubejs
+fi
+
+echo "Copying KubeJS files from $KUBEJS_DIR to $ENVIRONMENT_DIR/kubejs/"
+cp -a "$KUBEJS_DIR"/* "$ENVIRONMENT_DIR"/kubejs/

@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+THIS_DIR=/$(realpath --relative-to="/" "$(dirname "$0")")
+INSTALL_DIR="$THIS_DIR/server"
+
+if [ ! -d "$INSTALL_DIR" ]; then
+  echo "Server installation does not exist: $INSTALL_DIR, please run 'setup-server' first."
+  exit 1
+fi
+
+echo "Cleaning up server installation at $INSTALL_DIR..."
+rm -rf "$INSTALL_DIR/config"/* "$INSTALL_DIR/defaultconfigs"/* "$INSTALL_DIR/logs"/* "$INSTALL_DIR/mods"/* \
+  "$INSTALL_DIR/world" "$INSTALL_DIR/usercache.json" "$INSTALL_DIR/usernamecache.json" "$INSTALL_DIR/whitelist.json" \
+  "$INSTALL_DIR/ops.json" "$INSTALL_DIR/banned-ips.json" "$INSTALL_DIR/banned-players.json"
+echo "Server installation cleaned up successfully."
+
+exit 0

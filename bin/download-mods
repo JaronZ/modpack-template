@@ -1,0 +1,47 @@
+#!/bin/sh
+BASEDIR=/$(realpath -s --relative-to="/" "$(dirname "$0")")
+INSTALL_DIR=$(dirname "$BASEDIR")/install
+MODPACK_DIR=$PWD
+MODPACK_PATH="modpack"
+
+[ -d $INSTALL_DIR ] || mkdir $INSTALL_DIR
+cd $INSTALL_DIR || exit 1
+
+index_file=$(cat $MODPACK_DIR/$MODPACK_PATH/pack.toml | grep "file =" | grep -o -E "\".+\"" | grep -o -E "[^\"].*[^\"]")
+
+# Download files
+echo "Downloading files..."
+for file in $(cat $MODPACK_DIR/$MODPACK_PATH/$index_file | grep "file = \"" | grep -o -E "\".+\"" | grep -o -E "[^\"].*[^\"]"); do
+    dir=$(dirname $file)
+
+    [ "$(echo $file | grep -o -E "(kubejs|config|defaultconfigs)\/")" ] && continue
+
+    content=$(cat $MODPACK_DIR/$MODPACK_PATH/$file | awk -v ORS='\\n' '1')
+    side=$(echo $content | grep -o -E "side = \".+\"" | grep -o -E "\".+\"" | grep -o -E "[^\"].*[^\"]")
+    filename=$(echo $content | grep -o -E "filename = \".+\"" | grep -o -E "\".+\"" | grep -o -E "[^\"].*[^\"]")
+
+    set -- "$@" $filename
+
+    [ -f "$INSTALL_DIR/$side/$dir/$filename" ] && continue
+    [ -d "$INSTALL_DIR/$side/$dir" ] || mkdir -p "$INSTALL_DIR/$side/$dir"
+
+    if [ "$(echo $content | grep -o "\[update.curseforge\]")" ]; then
+        project_id=$(echo $content | grep -o -E "project-id = [0-9]+" | grep -o -E "[0-9]+")
+        file_id=$(echo $content | grep -o -E "file-id = [0-9]+" | grep -o -E "[0-9]+")
+        curl -L -o "$INSTALL_DIR/$side/$dir/$filename" "https://www.curseforge.com/api/v1/mods/$project_id/files/$file_id/download"
+    elif [ "$(echo $content | grep -o "\[update.modrinth\]")" ]; then
+        mod_id=$(echo $content | grep -o -E "mod-id = \".+\"" | grep -o -E "\".+\"" | grep -o -E "[^\"].*[^\"]")
+        version=$(echo $content | grep -o -E "version = \".+\"" | grep -o -E "\".+\"" | grep -o -E "[^\"].*[^\"]")
+        curl -L -o "$INSTALL_DIR/$side/$dir/$filename" "https://cdn.modrinth.com/data/$mod_id/versions/$version/$(echo "$filename" | jq -Rr @uri)"
+    fi
+done
+
+# Remove old files
+echo "Removing old files..."
+find . -type f -printf "%p\n" | while read file
+do
+    filename=$(basename "$file")
+    [ "$(echo "$@" | grep -o "$filename")" = "" ] && rm $file
+done
+
+exit 0

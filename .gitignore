@@ -1,0 +1,25 @@
+# NodeJS
+node_modules/
+
+# KubeJS files
+.probe/
+kubejs/
+
+# Yarn files
+.yarn/install-state.gz
+.yarn/build-state.yml
+
+# Turbo
+.turbo/
+
+# Coverage
+coverage/
+
+# TypeScript
+tsconfig.tsbuildinfo
+
+# Eclude precommit hooks config
+.pre-commit-config.yaml
+
+*.jar
+/install/

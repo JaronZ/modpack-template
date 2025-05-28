@@ -1,0 +1,46 @@
+#!/bin/sh
+BASEDIR=/$(realpath -s --relative-to="/" "$(dirname "$0")")
+INSTALL_DIR=$(dirname "$BASEDIR")/install
+ENVIRONMENT_DIR=$(dirname "$BASEDIR")/environment
+
+if [ ! -d "$INSTALL_DIR" ]; then
+    echo "Install directory $INSTALL_DIR does not exist."
+    exit 1
+fi
+
+if [ ! -d "$ENVIRONMENT_DIR" ]; then
+    echo "Environment directory $ENVIRONMENT_DIR does not exist."
+    exit 1
+fi
+
+if [ ! -d "$ENVIRONMENT_DIR/client" ]; then
+    echo "Creating client directory in $ENVIRONMENT_DIR"
+    mkdir -p "$ENVIRONMENT_DIR"/client
+fi
+
+if [ ! -d "$ENVIRONMENT_DIR/server" ]; then
+    echo "Creating server directory in $ENVIRONMENT_DIR"
+    mkdir -p "$ENVIRONMENT_DIR"/server
+fi
+
+echo "Copying files from $INSTALL_DIR to $ENVIRONMENT_DIR/client"
+[ -d "$INSTALL_DIR/both/config" ] && cp -a $INSTALL_DIR/both/config $ENVIRONMENT_DIR/client
+[ -d "$INSTALL_DIR/both/defaultconfigs" ] && cp -a $INSTALL_DIR/both/defaultconfigs $ENVIRONMENT_DIR/client
+[ -d "$INSTALL_DIR/both/resourcepacks" ] && cp -a $INSTALL_DIR/both/resourcepacks $ENVIRONMENT_DIR/client
+[ -d "$INSTALL_DIR/both/shaderpacks" ] && cp -a $INSTALL_DIR/both/shaderpacks $ENVIRONMENT_DIR/client
+[ -d "$INSTALL_DIR/client/config" ] && cp -a $INSTALL_DIR/client/config $ENVIRONMENT_DIR/client
+[ -d "$INSTALL_DIR/client/defaultconfigs" ] && cp -a $INSTALL_DIR/client/defaultconfigs $ENVIRONMENT_DIR/client
+[ -d "$INSTALL_DIR/client/resourcepacks" ] && cp -a $INSTALL_DIR/client/resourcepacks $ENVIRONMENT_DIR/client
+[ -d "$INSTALL_DIR/client/shaderpacks" ] && cp -a $INSTALL_DIR/client/shaderpacks $ENVIRONMENT_DIR/client
+
+echo "Copying files from $INSTALL_DIR to $ENVIRONMENT_DIR/server"
+[ -d "$INSTALL_DIR/both/config" ] && cp -a $INSTALL_DIR/both/config $ENVIRONMENT_DIR/server
+[ -d "$INSTALL_DIR/both/defaultconfigs" ] && cp -a $INSTALL_DIR/both/defaultconfigs $ENVIRONMENT_DIR/server
+[ -d "$INSTALL_DIR/both/resourcepacks" ] && cp -a $INSTALL_DIR/both/resourcepacks $ENVIRONMENT_DIR/server
+[ -d "$INSTALL_DIR/both/shaderpacks" ] && cp -a $INSTALL_DIR/both/shaderpacks $ENVIRONMENT_DIR/server
+[ -d "$INSTALL_DIR/server/config" ] && cp -a $INSTALL_DIR/server/config $ENVIRONMENT_DIR/server
+[ -d "$INSTALL_DIR/server/defaultconfigs" ] && cp -a $INSTALL_DIR/server/defaultconfigs $ENVIRONMENT_DIR/server
+[ -d "$INSTALL_DIR/server/resourcepacks" ] && cp -a $INSTALL_DIR/server/resourcepacks $ENVIRONMENT_DIR/server
+[ -d "$INSTALL_DIR/server/shaderpacks" ] && cp -a $INSTALL_DIR/server/shaderpacks $ENVIRONMENT_DIR/server
+
+exit 0

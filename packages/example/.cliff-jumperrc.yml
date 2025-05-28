@@ -1,0 +1,10 @@
+name: example
+org: jaronz
+install: true
+packagePath: packages/example
+identifierBase: false
+pushTag: true
+githubRelease: true
+githubReleaseLatest: true
+gitRepo: jaronz/modpack-template
+gitHostVariant: github

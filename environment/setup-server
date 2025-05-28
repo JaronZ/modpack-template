@@ -1,0 +1,24 @@
+#!/usr/bin/env sh
+THIS_DIR=/$(realpath --relative-to="/" "$(dirname "$0")")
+TMP_DIR=$(mktemp -d)
+NEO_VERSION="21.1.171"
+INSTALL_DIR="$THIS_DIR/server"
+
+echo "Downloading NeoForge installer.jar..."
+curl -L -o "$TMP_DIR/installer.jar" "https://maven.neoforged.net/releases/net/neoforged/neoforge/$NEO_VERSION/neoforge-$NEO_VERSION-installer.jar"
+
+echo "Running installer.jar..."
+mkdir "$INSTALL_DIR" 2>/dev/null
+java -jar "$TMP_DIR/installer.jar" --installServer "$INSTALL_DIR" --server-jar
+
+cd "$INSTALL_DIR" || exit 1
+
+if [ ! -f "$INSTALL_DIR/eula.txt" ]; then
+  echo "Setting up server with run script..."
+  sh ./run.sh
+fi
+
+rm -rf "$TMP_DIR" 2>/dev/null
+rm "$INSTALL_DIR/installer.jar.log" 2>/dev/null
+
+exit 0

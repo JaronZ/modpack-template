@@ -1,0 +1,14 @@
+#!/bin/sh
+BASEDIR=/$(realpath -s --relative-to="/" "$(dirname "$0")")
+INSTALL_DIR=$(dirname "$BASEDIR")/install
+MODPACK_DIR=$PWD/modpack
+
+echo "Copying configs from $MODPACK_DIR to $INSTALL_DIR"
+
+[ -d "$INSTALL_DIR/both/config" ] && rm -rf "$INSTALL_DIR/both/config"
+[ -d "$INSTALL_DIR/both/defaultconfigs" ] && rm -rf "$INSTALL_DIR/both/defaultconfigs"
+
+[ -d "$MODPACK_DIR/config" ] && cp -a "$MODPACK_DIR/config" "$INSTALL_DIR/both"
+[ -d "$MODPACK_DIR/defaultconfigs" ] && cp -a "$MODPACK_DIR/defaultconfigs" "$INSTALL_DIR/both"
+
+exit 0

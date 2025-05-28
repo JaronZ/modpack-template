@@ -1,0 +1,148 @@
+#!/usr/bin/env sh
+THIS_DIR=/$(realpath --relative-to="/" "$(dirname "$0")")
+MC_VERSION="1.21.1"
+NEO_VERSION="neoforge-21.1.171"
+GAME_DIR="$THIS_DIR/client"
+VERSION_DIR="$GAME_DIR/versions"
+LIB_DIR="$GAME_DIR/libraries"
+ASSETS_DIR="$GAME_DIR/assets"
+OS_NAME=$(./detect-os)
+ARCH=$(./detect-arch)
+
+classpath_separator() {
+  if [ "$OS_NAME" = "windows" ]; then
+    echo ";"
+  else
+    echo ":"
+  fi
+}
+CLASSPATH_SEPARATOR=$(classpath_separator)
+
+NEO_JSON="$VERSION_DIR/$NEO_VERSION/$NEO_VERSION.json"
+MC_JAR="$VERSION_DIR/$MC_VERSION/$MC_VERSION.jar"
+
+BASE_VERSION=$(jq -r '.inheritsFrom // empty' "$NEO_JSON")
+BASE_JSON="$VERSION_DIR/$BASE_VERSION/$BASE_VERSION.json"
+
+if [ ! -f "$NEO_JSON" ] || [ ! -f "$MC_JAR" ]; then
+  echo "Missing NeoForge JSON or base Minecraft JAR."
+  exit 1
+fi
+
+CLASSPATH=$(
+  jq -r --arg os_name "$OS_NAME" --arg arch "$ARCH" '
+    [., inputs | .libraries[]
+      | select(.name | test(":natives-") | not)
+      | (
+        if (.rules // []) | length == 0 then
+          "allow"
+        else
+          reduce (.rules // [])[] as $rule (
+            "disallow";
+            if (($rule.os? |
+              ($rule.os.name? == null or $rule.os.name == $os_name) and
+              ($rule.os.arch? == null or $rule.os.arch == $arch)) and
+              $rule.features? | false)
+            then
+              $rule.action
+            else
+              .
+            end
+          )
+        end
+      ) as $final_action
+      | if $final_action == "allow" then . else empty end
+      | .downloads.artifact.path]
+    | flatten
+    | unique
+    | .[]
+  ' "$BASE_JSON" "$NEO_JSON" | while read -r path; do
+    full_path="$LIB_DIR/$path"
+    [ -f "$full_path" ] && printf "%s$CLASSPATH_SEPARATOR" "$full_path"
+  done
+)
+
+MAIN_CLASS=$(jq -r '.mainClass // empty' "$BASE_JSON")
+MAIN_CLASS=$(jq -r ".mainClass // \"$MAIN_CLASS\"" "$NEO_JSON")
+
+ASSET_INDEX=$(jq -r '.assetIndex.id // empty' "$BASE_JSON")
+ASSET_INDEX=$(jq -r ".assetIndex.id // \"$ASSET_INDEX\"" "$NEO_JSON")
+
+substitute_placeholders() {
+  sed \
+    -e "s|\${launcher_name}|LumioseCraftTest|g" \
+    -e "s|\${launcher_version}|1.0.0|g" \
+    -e "s|\${classpath}|$CLASSPATH|g" \
+    -e "s|\${version_name}|$NEO_VERSION|g" \
+    -e "s|\${library_directory}|$LIB_DIR|g" \
+    -e "s|\${classpath_separator}|$CLASSPATH_SEPARATOR|g" \
+    -e "s|\${natives_directory}|natives|g" \
+    -e "s|\${assets_root}|$ASSETS_DIR|g" \
+    -e "s|\${assets_index_name}|$ASSET_INDEX|g" \
+    -e "s|\${auth_player_name}|OfflinePlayer|g" \
+    -e "s|\${auth_uuid}|00000000-0000-0000-0000-000000000000|g" \
+    -e "s|\${auth_access_token}|none|g" \
+    -e "s|\${user_type}|legacy|g" \
+    -e "s|\${version_type}|release|g" \
+    -e "s|\${game_directory}|$GAME_DIR|g" \
+    -e "s|\${clientid}|\"\"|g" \
+    -e "s|\${auth_xuid}|\"0\"|g"
+}
+
+extract_mc_args() {
+  type="$1"         # "jvm" or "game"
+  version_json="$2" # path to version JSON
+  os_name="$3"      # e.g., "linux"
+  arch="$4"         # e.g., "x86_64"
+
+  jq -r --arg os_name "$os_name" --arg arch "$arch" --arg type "$type" '
+    .arguments[$type][] |
+    if type == "object" then
+      (
+        if (.rules // []) | length == 0 then
+          .value
+        else
+          (
+            reduce(.rules // [])[] as $rule (
+              "disallow";
+              if (($rule.os? |
+                ($rule.os.name? == null or $rule.os.name == $os_name) and
+                ($rule.os.arch? == null or $rule.os.arch == $arch)) and
+                $rule.features? | false)
+              then
+                $rule.action
+              else
+                .
+              end
+            )
+          ) as $final_action |
+          if $final_action == "allow" then .value else empty end
+        end
+      ) | if type == "array" then .[] else . end
+    else
+      .
+    end
+  ' "$version_json"
+}
+
+JVM_ARGS=$(extract_mc_args "jvm" "$BASE_JSON" "$OS_NAME" "$ARCH" | substitute_placeholders | paste -sd " " -)
+JVM_ARGS="${JVM_ARGS} $(extract_mc_args "jvm" "$NEO_JSON" "$OS_NAME" "$ARCH" | substitute_placeholders | paste -sd " " -)"
+
+echo "$JVM_ARGS"
+
+GAME_ARGS=$(extract_mc_args "game" "$BASE_JSON" "$OS_NAME" "$ARCH" | substitute_placeholders | paste -sd " " -)
+GAME_ARGS="${GAME_ARGS} $(extract_mc_args "game" "$NEO_JSON" "$OS_NAME" "$ARCH" | substitute_placeholders | paste -sd " " -)"
+
+echo "$GAME_ARGS"
+
+ASSETS_INDEX=$(jq -r '.assets // empty' "$BASE_JSON")
+ASSETS_INDEX=$(jq -r ".assets // \"$ASSETS_INDEX\"" "$NEO_JSON")
+
+cd "$GAME_DIR" || exit 1
+
+java \
+  $JVM_ARGS \
+  "$MAIN_CLASS" \
+  $GAME_ARGS
+
+exit 0

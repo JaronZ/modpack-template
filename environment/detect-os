@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+detect_os() {
+  case "$(uname -s)" in
+    Linux*)     echo "linux";;
+    Darwin*)    echo "osx";;
+    CYGWIN*|MINGW*|MSYS*) echo "windows";;
+    *)          echo "unknown";;
+  esac
+}
+OS=$(detect_os)
+
+if [ "$OS" = "unknown" ]; then
+  echo "Unsupported operating system: $(uname -s)"
+  exit 1
+fi
+
+echo "$OS"
+exit 0

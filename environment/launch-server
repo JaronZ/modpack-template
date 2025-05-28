@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+THIS_DIR=$(dirname "$0")
+cd "$THIS_DIR/server" || exit 1
+./run.sh "$@"
+exit 0

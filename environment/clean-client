@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+THIS_DIR=/$(realpath --relative-to="/" "$(dirname "$0")")
+INSTALL_DIR="$THIS_DIR/client"
+
+if [ ! -d "$INSTALL_DIR" ]; then
+  echo "Client installation does not exist: $INSTALL_DIR, please run 'setup-client' first."
+  exit 1
+fi
+
+echo "Cleaning up client installation at $INSTALL_DIR..."
+rm -rf "$INSTALL_DIR/config"/* "$INSTALL_DIR/defaultconfigs"/* "$INSTALL_DIR/downloads"/* "$INSTALL_DIR/logs"/* \
+  "$INSTALL_DIR/mods"/* "$INSTALL_DIR/resourcepacks"/* "$INSTALL_DIR/saves"/* "$INSTALL_DIR/shaderpacks"/* \
+  "$INSTALL_DIR/options.txt" "$INSTALL_DIR/servers.dat" "$INSTALL_DIR/servers.dat_old" \
+  "$INSTALL_DIR/usercache.json" "$INSTALL_DIR/usernamecache.json"
+echo "Client installation cleaned up successfully."
+
+exit 0

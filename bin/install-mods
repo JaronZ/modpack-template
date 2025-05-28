@@ -1,0 +1,22 @@
+#!/bin/sh
+BASEDIR=/$(realpath -s --relative-to="/" $(dirname "$0"))
+INSTALL_DIR=$(dirname "$BASEDIR")/install
+ENVIRONMENT_DIR=$(dirname "$BASEDIR")/environment
+
+if [ ! -d "$INSTALL_DIR" ]; then
+    echo "Install directory $INSTALL_DIR does not exist."
+    exit 1
+fi
+
+if [ ! -d "$ENVIRONMENT_DIR" ]; then
+    echo "Environment directory $ENVIRONMENT_DIR does not exist."
+    exit 1
+fi
+
+echo "Installing mods from $INSTALL_DIR to $ENVIRONMENT_DIR"
+cp -a $INSTALL_DIR/both/mods/. $ENVIRONMENT_DIR/client/mods
+cp -a $INSTALL_DIR/both/mods/. $ENVIRONMENT_DIR/server/mods
+cp -a $INSTALL_DIR/client/mods/. $ENVIRONMENT_DIR/client/mods
+cp -a $INSTALL_DIR/server/mods/. $ENVIRONMENT_DIR/server/mods
+
+exit 0

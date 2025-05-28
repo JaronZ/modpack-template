@@ -1,0 +1,158 @@
+#!/usr/bin/env sh
+THIS_DIR=$(dirname "$0")
+TMP_DIR=$(mktemp -d)
+MC_VERSION="1.21.1"
+NEO_VERSION="21.1.171"
+INSTALL_DIR="$THIS_DIR/client"
+VERSIONS_DIR="$INSTALL_DIR/versions"
+VERSION_DIR="$VERSIONS_DIR/${MC_VERSION}"
+LIBRARY_DIR="$INSTALL_DIR/libraries"
+ASSETS_DIR="$INSTALL_DIR/assets"
+ASSET_INDEX_DIR="$ASSETS_DIR/indexes"
+NATIVES_DIR="$INSTALL_DIR/natives"
+OS_NAME=$(./detect-os)
+ARCH=$(./detect-arch)
+
+[ ! -d "$VERSIONS_DIR" ] && mkdir -p "$VERSIONS_DIR"
+
+if [ ! -f "$VERSIONS_DIR/version_manifest_v2.json" ]; then
+  echo "Downloading version manifest..."
+  curl -sSL -o "$VERSIONS_DIR/version_manifest_v2.json" https://piston-meta.mojang.com/mc/game/version_manifest_v2.json
+fi
+
+VERSION_META_URL=$(jq -r ".versions[] | select(.id == \"$MC_VERSION\") | .url" < "$VERSIONS_DIR/version_manifest_v2.json")
+
+if [ -z "$VERSION_META_URL" ]; then
+    echo "Could not find metadata for version $MC_VERSION"
+    exit 1
+fi
+
+[ ! -d "$VERSION_DIR" ] && mkdir -p "$VERSION_DIR"
+
+VERSION_JSON="$VERSION_DIR/$MC_VERSION.json"
+
+if [ ! -f "$VERSION_JSON" ]; then
+  echo "Downloading Minecraft $MC_VERSION metadata..."
+  curl -sSL -o "$VERSION_JSON" "$VERSION_META_URL"
+fi
+
+if [ ! -f "$VERSION_DIR/$MC_VERSION.jar" ]; then
+  MC_JAR_URL=$(jq -r '.downloads.client.url' "$VERSION_JSON")
+  echo "Downloading Minecraft $MC_VERSION client JAR..."
+  curl -sSL -o "$VERSION_DIR/$MC_VERSION.jar" "$MC_JAR_URL"
+fi
+
+[ ! -d "$LIBRARY_DIR" ] && mkdir -p "$LIBRARY_DIR"
+
+echo "Downloading library files..."
+jq -r --arg os_name "$OS_NAME" --arg arch "$ARCH" --arg natives_dir "$NATIVES_DIR" --arg lib_dir "$LIBRARY_DIR" '
+  .libraries[] |
+  if (.rules // []) | length == 0 then
+    .
+  else
+    (
+      reduce(.rules // [])[] as $rule (
+        "disallow";
+        if ($rule.os? |
+          ($rule.os.name? == null or $rule.os.name == $os_name) and
+          ($rule.os.arch? == null or $rule.os.arch == $arch))
+        then
+          $rule.action
+        else
+          .
+        end
+      )
+    ) as $final_action |
+    if $final_action == "allow" then . else empty end
+  end
+  | .downloads.artifact
+  | "\(.url) \(.path)"
+' "$VERSION_JSON" | while read -r URL PATH; do
+  DEST="$LIBRARY_DIR/$PATH"
+  DIR=$(/usr/bin/dirname "$DEST")
+
+  if [ ! -f "$DEST" ]; then
+    echo "Downloading $PATH"
+    /usr/bin/mkdir -p "$DIR" || exit 1
+    /usr/bin/curl -4 -fsSL "$URL" -o "$DEST" || {
+      echo "Failed to download: $URL"
+      exit 1
+    }
+  fi
+done
+
+[ ! -d "$NATIVES_DIR" ] && mkdir -p "$NATIVES_DIR"
+
+echo "Extracting native libraries..."
+jq -r --arg os_name "$OS_NAME" --arg arch "$ARCH" '
+  def natives_name: ":natives-" + $os_name;
+  .libraries[]
+  | (
+    if $arch != "x86_64" then
+      natives_name + "-" + $arch
+    else
+      natives_name
+    end
+  ) as $filter
+  | select(.name | test($filter + "$"))
+  | .downloads.artifact.path
+' "$VERSION_JSON" | while read -r PATH; do
+  JAR="$LIBRARY_DIR/$PATH"
+
+  if [ -f "$JAR" ]; then
+    echo "Extracting $PATH"
+    /usr/bin/unzip -Z1 "$JAR" | /usr/bin/grep -Ei '\.(so|dll|dylib)$' | while read -r file; do
+      /usr/bin/unzip -jqo "$JAR" "$file" -d "$NATIVES_DIR"
+    done || {
+      echo "Failed to extract: $JAR"
+      exit 1
+    }
+  else
+    echo "Native library not found: $JAR"
+    exit 1
+  fi
+done
+
+[ ! -d "$ASSET_INDEX_DIR" ] && mkdir -p "$ASSET_INDEX_DIR"
+
+echo "Downloading version assets..."
+ASSETS_URL=$(jq -r '.assetIndex.url' "$VERSION_JSON")
+ASSET_INDEX_NAME=$(basename "$ASSETS_URL")
+INDEX_FILE="$ASSET_INDEX_DIR/$ASSET_INDEX_NAME"
+
+[ ! -f "$INDEX_FILE" ] && curl -sSL -o "$INDEX_FILE" "$ASSETS_URL"
+
+jq -r '.objects | to_entries[] | "\(.value.hash) \(.key)"' "$INDEX_FILE" |
+while IFS=" " read -r HASH PATH; do
+    SUBDIR=$(echo "$HASH" | /usr/bin/cut -c1-2)
+    URL="https://resources.download.minecraft.net/$SUBDIR/$HASH"
+    DEST_DIR="$ASSETS_DIR/objects/$SUBDIR"
+    DEST="$DEST_DIR/$HASH"
+
+    if [ ! -f "$DEST" ]; then
+        echo "Downloading $PATH"
+        /usr/bin/mkdir -p "$DEST_DIR" || exit 1
+        /usr/bin/curl -4 -sSL "$URL" -o "$DEST" || exit 1
+    fi
+done
+
+echo "Generating launcher profiles..."
+PROFILE_FILE="$INSTALL_DIR/launcher_profiles.json"
+if [ ! -f "$PROFILE_FILE" ]; then
+  echo '{
+  "profiles": {},
+  "settings": {},
+  "version": 4
+}' > "$PROFILE_FILE"
+fi
+
+echo "Downloading NeoForge installer.jar..."
+curl -L -o "$TMP_DIR/installer.jar" "https://maven.neoforged.net/releases/net/neoforged/neoforge/$NEO_VERSION/neoforge-$NEO_VERSION-installer.jar"
+
+echo "Running installer.jar..."
+java -jar "$TMP_DIR/installer.jar" --installClient "$INSTALL_DIR"
+
+rm -rf "$TMP_DIR" 2>/dev/null
+rm "$THIS_DIR/installer.jar.log" 2>/dev/null
+
+exit 0
